@@ -18,6 +18,8 @@
 #define COMMAND_LEN_MAX     32
 #define COMMAND_LEN_MIN     2
 #define CMD_DELIMITER       " "
+#define COMMAND_ARGS_MAX	8
+#define ARGS_LEN_MAX		32
 
 /**
  * Converts a string argument to a number
@@ -37,17 +39,19 @@ static void handle_command(command_t command);
  * Command list
  *
  * Note - The Commands(and their order) in this list must EXACTLY MATCH
- * the commands in the "command_list_t" enumerator.
+ * the commands in the "command_t" enumerator.
  */
 const char* COMMANDS[] = {
     "reset",
     "led",
     NULL
 };
-// UART buffer
+// Command buffer
 static uint8_t command_byte_buffer;
 static uint8_t command_buffer[COMMAND_LEN_MAX];
 static uint8_t command_length = 0;
+static char command_args[COMMAND_ARGS_MAX][ARGS_LEN_MAX];
+static uint8_t command_args_num = 0;
 
 void uart_interface_init(UART_HandleTypeDef *huart) {
 	HAL_UART_Receive_DMA(huart, &command_byte_buffer, 1);
@@ -80,13 +84,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	for(i = 0; command_buffer[i]; i++) {
 		command_buffer[i] = tolower(command_buffer[i]);
 	}
+
+	// Extract the command
 	i = 0;
 	int16_t cmd_index = -1;
-	// Get arguments, if they exist
 	char *cmd = strtok((char *)command_buffer, CMD_DELIMITER);
-	// char *args = strtok(NULL, CMD_DELIMITER);
-	// long arg_num;
-
 	// Check if the received string is a command
 	while (COMMANDS[i] != NULL) {
 		if (strcmp(cmd, COMMANDS[i]) == 0) {
@@ -95,10 +97,26 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 		}
 		i++;
 	}
-	// Reset the command buffer
-	command_length = 0;
+
+	// Get arguments, if they exist
+	char *args = strtok(NULL, CMD_DELIMITER);
+	while (args != NULL) {
+		uint32_t arg_len = strlen(args);
+		if (arg_len > (ARGS_LEN_MAX - 1)) {
+			// Skip argument, if the it's longer, than maximum allowed length
+			continue;
+		}
+		memcpy(command_args[command_args_num++], args, arg_len+1);
+		// Get the next argument
+		args = strtok(NULL, CMD_DELIMITER);
+	}
+
 	// Run the command
 	handle_command((command_t)cmd_index);
+	// Reset the command buffer
+	command_length = 0;
+	// Reset argument buffer
+	command_args_num = 0;
 }
 
 static long str_to_num(char *str) {
@@ -118,6 +136,14 @@ static void handle_command(command_t command) {
 		break;
 
 	case CMD_LED:
+		if (command_args_num == 1) {
+			if (strcmp(command_args[0], "on") == 0) {
+				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+			} else if (strcmp(command_args[0], "off") == 0) {
+				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+			}
+			break;
+		}
 		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
 		break;
 
