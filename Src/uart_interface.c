@@ -56,7 +56,7 @@ void uart_interface_init(UART_HandleTypeDef *huart) {
 // Overload the UART RX callback
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	// Check for command buffer overflow
-	if(command_length >= COMMAND_LEN_MAX) {
+	if (command_length >= COMMAND_LEN_MAX) {
 		// Reset the command buffer
 		command_length = 0;
 		return;
@@ -65,11 +65,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	command_buffer[command_length++] = command_byte_buffer;
 
 	// Ignore, if the command hasn't reached minimal length
-	if(command_length < COMMAND_LEN_MIN) {
+	if (command_length < COMMAND_LEN_MIN) {
 		return;
 	}
 	// Check for CR/LF termination
-	if(command_buffer[command_length-2] != '\r' || command_buffer[command_length-1] != '\n') {
+	if (command_buffer[command_length-2] != '\r'
+			|| command_buffer[command_length-1] != '\n') {
 		return;
 	}
 	// Move the null termination to the start of CR/LF
@@ -87,8 +88,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	// long arg_num;
 
 	// Check if the received string is a command
-	while(COMMANDS[i] != NULL) {
-		if(strcmp(cmd, COMMANDS[i]) == 0) {
+	while (COMMANDS[i] != NULL) {
+		if (strcmp(cmd, COMMANDS[i]) == 0) {
 			cmd_index = i;
 			break;
 		}
@@ -112,8 +113,8 @@ static long str_to_num(char *str) {
 static void handle_command(command_t command) {
 	switch (command) {
 	case CMD_RESET:
-		//const char *RESET_REPLY = "Reseting...\n";
-		//HAL_UART_Transmit(huart, RESET_REPLY, strlen(RESET_REPLY), 10);
+		printf("Reseting...\n");
+		NVIC_SystemReset();
 		break;
 
 	case CMD_LED:
@@ -121,7 +122,7 @@ static void handle_command(command_t command) {
 		break;
 
 	default:
-		// Unknown command
+		printf("Invalid command!\n");
 		break;
 	}
 }
