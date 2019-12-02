@@ -27,4 +27,11 @@
 		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
 		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
 	</natures>
+	<linkedResources>
+		<link>
+			<name>STM32L4xx_HAL_Driver_Src</name>
+			<type>2</type>
+			<locationURI>PROJECT_LOC/Drivers/STM32L4xx_HAL_Driver/Src</locationURI>
+		</link>
+	</linkedResources>
 </projectDescription>
