@@ -12,8 +12,8 @@ tmp/
 # External tool builders
 .externalToolBuilders/
 # Locally stored "Eclipse launch configurations"
-*.launch # CDT-specific (C/C++ Development Tooling)
-.cproject
+# *.launch # CDT-specific (C/C++ Development Tooling)
+# .cproject
 # sbteclipse plugin
 .target
 # Tern plugin
