@@ -55,6 +55,7 @@ static void handle_command(command_t command);
 const char* COMMANDS[] = {
     "RESET",
     "LED",
+	"M112",
 	"G00",
 	"G01",
 	"G28",
@@ -170,6 +171,23 @@ static void handle_command(command_t command) {
 				break;
 			}
 			HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+			break;
+
+		case CMD_M112:
+			// Emergency stop
+			if (command_args_num == 1) {
+				if (command_args[0][0] == 'X') {
+					stop_x();
+
+				} else if (command_args[0][0] == 'Y') {
+					stop_y();
+
+				} else {
+					stop();
+				}
+				break;
+			}
+			stop();
 			break;
 
 		case CMD_G00:
