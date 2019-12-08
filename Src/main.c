@@ -25,6 +25,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "uart_interface.h"
+#include "motor_driver.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -34,11 +35,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define ENCODER_CPR	(48.0f) // Counts per revolution
-#define GEAR_RATIO (20.4f)	// 20.4:1
-#define THREAD_PITCH (2.4f) // [mm]
-#define MOTOR_STEP (THREAD_PITCH / (ENCODER_CPR * GEAR_RATIO))
-#define RELATIVE_POSITION(COUNTS) (COUNTS * MOTOR_STEP)
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -106,9 +103,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-  float absolute_position = 0.0;
-  int16_t old_encoder_count = 0;
-  int32_t encoder_absolute = 0;
+
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -120,8 +115,8 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART2_UART_Init();
   MX_DMA_Init();
+  MX_USART2_UART_Init();
   MX_TIM1_Init();
   MX_TIM3_Init();
   MX_TIM2_Init();
@@ -129,27 +124,9 @@ int main(void)
   MX_TIM8_Init();
   MX_TIM16_Init();
   /* USER CODE BEGIN 2 */
+  // NOTE: The DMA MUST be initialized before the UART, otherwise the UART RX won't work
   uart_interface_init(&huart2);
-
-  // Motor A
-  HAL_GPIO_WritePin(EN_A_GPIO_Port, EN_A_Pin, GPIO_PIN_SET);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
-  htim3.Instance->CCR1 = 50;
-
-  HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_1);
-  HAL_TIM_Encoder_Start(&htim1, TIM_CHANNEL_2);
-
-  // Motor B
-  HAL_GPIO_WritePin(EN_B_GPIO_Port, EN_B_Pin, GPIO_PIN_SET);
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
-  htim2.Instance->CCR1 = 50;
-
-  HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_1);
-  HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_2);
-
-  printf("Motor step: %f\n", MOTOR_STEP);
+  motor_driver_init(&htim3, &htim1, &htim2, &htim4);
 
   /* USER CODE END 2 */
 
@@ -157,14 +134,13 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  int16_t encoder_count = TIM1->CNT;
-	  int16_t encoder_relative = encoder_count - old_encoder_count;
-	  encoder_absolute += encoder_relative;
-	  absolute_position = (float)encoder_absolute * MOTOR_STEP;
-	  old_encoder_count = encoder_count;
-
-	  printf("Absolute position: %f\n", absolute_position);
-	  HAL_Delay(1000);
+	  motor_driver_update();
+	  state_t state = get_state();
+	  /*printf("Absolute position - X: %f, Y: %f\nMove start - X: %f, Y: %f\nMove end - X: %f, Y: %f\n",
+			  state.position.x, state.position.y,
+			  state.move_start_x, state.move_start_y,
+			  state.move_end_x, state.move_end_y);*/
+	  HAL_Delay(1);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

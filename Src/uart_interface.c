@@ -15,11 +15,16 @@
 #include <ctype.h>
 #include <errno.h>
 
+#include "motor_driver.h"
+
 #define COMMAND_LEN_MAX     32
 #define COMMAND_LEN_MIN     2
 #define CMD_DELIMITER       " "
 #define COMMAND_ARGS_MAX	8
 #define ARGS_LEN_MAX		32
+
+#define DEFAULT_G00_FEEDRATE	(10.0f)
+#define DEFAULT_G01_FEEDRATE	(5.0f)
 
 /**
  * Converts a string argument to a number
@@ -27,6 +32,12 @@
  * @param	str		String to convert
  */
 static long str_to_num(char *str);
+/**
+ * Converts a string argument to a float
+ *
+ * @param	str		String to convert
+ */
+static float str_to_float(char *str);
 /**
  * Command handler
  * Extracts, validates and executes received commands.
@@ -42,8 +53,11 @@ static void handle_command(command_t command);
  * the commands in the "command_t" enumerator.
  */
 const char* COMMANDS[] = {
-    "reset",
-    "led",
+    "RESET",
+    "LED",
+	"G00",
+	"G01",
+	"G28",
     NULL
 };
 // Command buffer
@@ -82,7 +96,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	// Convert the command to lower case
 	uint16_t i;
 	for(i = 0; command_buffer[i]; i++) {
-		command_buffer[i] = tolower(command_buffer[i]);
+		command_buffer[i] = toupper(command_buffer[i]);
 	}
 
 	// Extract the command
@@ -128,27 +142,71 @@ static long str_to_num(char *str) {
     return number;
 }
 
+static float str_to_float(char *str) {
+	float number = strtof(str, NULL);
+	if (number == 0 && (errno == EINVAL || errno == ERANGE)) {
+		//ESP_LOGE(TAG, "The given string can't be converted to a float!");
+		errno = 0;
+	}
+	return number;
+}
+
 static void handle_command(command_t command) {
 	switch (command) {
-	case CMD_RESET:
-		printf("Reseting...\n");
-		NVIC_SystemReset();
-		break;
+		case CMD_RESET:
+			// Reset the system
+			printf("Reseting...\n");
+			NVIC_SystemReset();
+			break;
 
-	case CMD_LED:
-		if (command_args_num == 1) {
-			if (strcmp(command_args[0], "on") == 0) {
-				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-			} else if (strcmp(command_args[0], "off") == 0) {
-				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+		case CMD_LED:
+			// Toggle the onboard LED
+			if (command_args_num == 1) {
+				if (strcmp(command_args[0], "on") == 0) {
+					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
+				} else if (strcmp(command_args[0], "off") == 0) {
+					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
+				}
+				break;
+			}
+			HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+			break;
+
+		case CMD_G00:
+			// Rapid positioning
+			if (command_args_num >= 1) {
+				state_t driver_state = get_state();
+				driver_state.feedrate = DEFAULT_G00_FEEDRATE;
+				char parse_buffer[COMMAND_ARGS_MAX];
+
+				// Parse X coordinate
+				uint8_t i;
+				for (i = 0; i < command_args_num; i++) {
+					memcpy(parse_buffer, (command_args[i])+1, strlen(command_args[i]));
+					if (command_args[i][0] == 'X') {
+						driver_state.position.x = str_to_float(parse_buffer);
+
+					} else if (command_args[i][0] == 'Y') {
+						driver_state.position.y = str_to_float(parse_buffer);
+
+					} else if (command_args[i][0] == 'F') {
+						driver_state.feedrate = str_to_float(parse_buffer);
+					}
+				}
+				move(driver_state.position, driver_state.feedrate);
 			}
 			break;
-		}
-		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-		break;
 
-	default:
-		printf("Invalid command!\n");
-		break;
+		case CMD_G01:
+			// Linear interpolation
+			break;
+
+		case CMD_G28:
+			// Home axes
+			break;
+
+		default:
+			printf("Invalid command!\n");
+			break;
 	}
 }
