@@ -23,7 +23,7 @@
 #define KP (0.15f)
 #define KI (0.00001f)
 #define KD (0.00005f)
-#define ALLOWED_ERROR_MARGIN (0.001f)
+#define ALLOWED_ERROR_MARGIN (0.05f)
 
 
 // Private function declarations
@@ -189,31 +189,36 @@ static void _move_axis(axis_t axis) {
 		default:
 			return;
 	}
+	// Check if the position was already reached
+	float margin = end_position - current_position;
+	if (margin <= ALLOWED_ERROR_MARGIN
+			&& margin >= -ALLOWED_ERROR_MARGIN) {
+		_stop_axis(axis, false);
+		return;
+	}
 
 	// Calculate the axis position difference after move
+	// TODO: This statement causes the initial error to not be corrected by the PID regulation
 	float relative_position = end_position - start_position;
 	if (relative_position == 0) {
-		//_stop_axis(axis, false);
-		//return;
+		_stop_axis(axis, false);
+		return;
 	}
 	float absolute_relative_position = fabsf(relative_position);
 	float time_to_arrival = absolute_relative_position / feedrate;
-	if (move_time > time_to_arrival) {
-		//_stop_axis(axis, false);
-		//return;
-	}
 
 	// Calculate the new velocity increment
 	//float velocity_increment = (-6 / pow(time_to_arrival, 3))*absolute_relative_position*pow(move_time, 2) + (6 / pow(time_to_arrival, 2))*absolute_relative_position*move_time;
 	//velocity_increment = velocity_increment < 0 ? 0 : velocity_increment;
 
-	// Calculate position
-	//float position = (-2 / pow(time_to_arrival, 3))*absolute_relative_position*pow(move_time, 3) + (3 / pow(time_to_arrival, 2))*absolute_relative_position*pow(move_time, 2)+fabsf(start_position);
-	//position = position < 0 ? 0 : position;
+	// Calculate the S-curve
+	float position = (-2 / pow(time_to_arrival, 3))*relative_position*pow(move_time, 3) + (3 / pow(time_to_arrival, 2))*relative_position*pow(move_time, 2)+start_position;
+	// Clamp S-curve by time
+	position = move_time > time_to_arrival ? end_position : position;
 
 	// Calculate the real vs calculated velocity difference
 	// float dx = current_position - last_position;
-	float error = end_position - current_position;
+	float error = position - current_position;
 	*cumulative_error += error * dt;
 	float rate_error = (error - *last_error) / dt;
 	*last_error = error;
@@ -235,11 +240,11 @@ static void _move_axis(axis_t axis) {
 	}
 
 	// Set axis motor PWM duty cycle
-	if (error > 0 && error > ALLOWED_ERROR_MARGIN) {
+	if (error > 0) {
 		motor_timer->Instance->CCR1 = duty_cycle;
 		motor_timer->Instance->CCR2 = 0;
 
-	} else if (error < 0 && error < -ALLOWED_ERROR_MARGIN) {
+	} else if (error < 0) {
 		motor_timer->Instance->CCR1 = 0;
 		motor_timer->Instance->CCR2 = duty_cycle;
 

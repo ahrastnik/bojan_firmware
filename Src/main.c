@@ -81,6 +81,7 @@ static void MX_TIM16_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 PUTCHAR_PROTOTYPE {
+	// TODO: The blocking nature of printf causes instability issues in the motor speed regulation
 	HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 0xFFFF);
 	return ch;
 }
@@ -140,10 +141,10 @@ int main(void)
 
 	  i++;
 	  if (i >= 100) {
-		  printf("Absolute position - X: %f, Y: %f\nMove start - X: %f, Y: %f\nMove end - X: %f, Y: %f\n",
+		  /*printf("Absolute position - X: %f, Y: %f\nMove start - X: %f, Y: %f\nMove end - X: %f, Y: %f\n",
 		  			  state.position.x, state.position.y,
 		  			  state.axis_x.move_start, state.axis_y.move_start,
-		  			  state.axis_x.move_end, state.axis_y.move_end);
+		  			  state.axis_x.move_end, state.axis_y.move_end);*/
 		  i = 0;
 	  }
 
