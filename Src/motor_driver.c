@@ -8,6 +8,8 @@
 #include "motor_driver.h"
 
 #include <math.h>
+#include <stdbool.h>
+#include <stdio.h>
 
 #include "main.h"
 
@@ -18,21 +20,26 @@
 #define MOTOR_STEP (THREAD_PITCH / (ENCODER_CPR * GEAR_RATIO))
 #define MOTOR_MAX_RPS (370.0f / 60.0f) // Max rotations per seconds at no load (12V)
 
+#define KP (0.15f)
+#define KI (0.00001f)
+#define KD (0.00005f)
+#define ALLOWED_ERROR_MARGIN (0.001f)
+
 
 // Private function declarations
 /**
  * Update the moving axis
  *
  * @param axis	Axis to update
- * @param time	Current Systick in milliseconds
  */
-static void _move_axis(axis_t axis, uint32_t time);
+static void _move_axis(axis_t axis);
 /**
  * Stop an axis
  *
  * @param axis	Axis to stop
+ * @param clear	Clear the axis data
  */
-static void _stop_axis(axis_t axis);
+static void _stop_axis(axis_t axis, bool clear);
 /**
  * Get the current absolute position of the axis
  *
@@ -53,14 +60,26 @@ static volatile state_t _state = {
 				.x = 0.0,
 				.y = 0.0,
 		},
-		.move_start_time_x = 0,
-		.move_start_x = 0.0,
-		.move_end_x = 0.0,
-		.move_start_time_y = 0,
-		.move_start_y = 0.0,
-		.move_end_y = 0.0,
-		.feedrate = 0.0,
-		.z = 0
+		.z = 0,
+		.axis_x = {
+				.last_sample_time = 0,
+				.move_start_time = 0,
+				.last_position = 0.0,
+				.move_start = 0.0,
+				.move_end = 0.0,
+				.last_error = 0.0,
+				.cumulative_error = 0.0
+		},
+		.axis_y = {
+				.last_sample_time = 0,
+				.move_start_time = 0,
+				.last_position = 0.0,
+				.move_start = 0.0,
+				.move_end = 0.0,
+				.last_error = 0.0,
+				.cumulative_error = 0.0
+		},
+		.feedrate = 0.0
 };
 
 // Encoders
@@ -122,28 +141,48 @@ void axis_y_disable(void) {
 }
 
 
-static void _move_axis(axis_t axis, uint32_t time) {
+static void _move_axis(axis_t axis) {
 	// Get the requested axis motor timer
+	uint32_t time = HAL_GetTick();
 	TIM_HandleTypeDef *motor_timer;
+	float current_position;
 	float start_position;
 	float end_position;
 	float feedrate;
 	float move_time;
+	float dt;
+	float last_position;
+	volatile float *cumulative_error;
+	volatile float *last_error;
 
 	switch (axis) {
 		case AXIS_X:
 			motor_timer = _motor_a_timer;
-			move_time = ((float)(time - _state.move_start_time_x) / 1000);
-			start_position = _state.move_start_x;
-			end_position = _state.move_end_x;
+			current_position = _state.position.x;
+			move_time = ((float)(time - _state.axis_x.move_start_time) / 1000);
+			dt = ((float)(time - _state.axis_x.last_sample_time) / 1000);
+			_state.axis_x.last_sample_time = time;
+			last_position = _state.axis_x.last_position;
+			_state.axis_x.last_position = _state.position.x;
+			start_position = _state.axis_x.move_start;
+			end_position = _state.axis_x.move_end;
+			last_error = &_state.axis_x.last_error;
+			cumulative_error = &_state.axis_x.cumulative_error;
 			feedrate = _state.feedrate;
 			break;
 
 		case AXIS_Y:
 			motor_timer = _motor_b_timer;
-			move_time = ((float)(time - _state.move_start_time_y) / 1000);
-			start_position = _state.move_start_y;
-			end_position = _state.move_end_y;
+			current_position = _state.position.y;
+			move_time = ((float)(time - _state.axis_y.move_start_time) / 1000);
+			dt = ((float)(time - _state.axis_y.last_sample_time) / 1000);
+			_state.axis_y.last_sample_time = time;
+			last_position = _state.axis_y.last_position;
+			_state.axis_y.last_position = _state.position.y;
+			start_position = _state.axis_y.move_start;
+			end_position = _state.axis_y.move_end;
+			last_error = &_state.axis_y.last_error;
+			cumulative_error = &_state.axis_y.cumulative_error;
 			feedrate = _state.feedrate;
 			break;
 
@@ -154,22 +193,38 @@ static void _move_axis(axis_t axis, uint32_t time) {
 	// Calculate the axis position difference after move
 	float relative_position = end_position - start_position;
 	if (relative_position == 0) {
-		_stop_axis(axis);
-		return;
+		//_stop_axis(axis, false);
+		//return;
 	}
 	float absolute_relative_position = fabsf(relative_position);
 	float time_to_arrival = absolute_relative_position / feedrate;
 	if (move_time > time_to_arrival) {
-		_stop_axis(axis);
-		return;
+		//_stop_axis(axis, false);
+		//return;
 	}
 
 	// Calculate the new velocity increment
-	float velocity_increment = (-6 / pow(time_to_arrival, 3))*absolute_relative_position*pow(move_time, 2) + (6 / pow(time_to_arrival, 2))*absolute_relative_position*move_time;
-	velocity_increment = velocity_increment < 0 ? 0 : velocity_increment;
+	//float velocity_increment = (-6 / pow(time_to_arrival, 3))*absolute_relative_position*pow(move_time, 2) + (6 / pow(time_to_arrival, 2))*absolute_relative_position*move_time;
+	//velocity_increment = velocity_increment < 0 ? 0 : velocity_increment;
+
+	// Calculate position
+	//float position = (-2 / pow(time_to_arrival, 3))*absolute_relative_position*pow(move_time, 3) + (3 / pow(time_to_arrival, 2))*absolute_relative_position*pow(move_time, 2)+fabsf(start_position);
+	//position = position < 0 ? 0 : position;
+
+	// Calculate the real vs calculated velocity difference
+	// float dx = current_position - last_position;
+	float error = end_position - current_position;
+	*cumulative_error += error * dt;
+	float rate_error = (error - *last_error) / dt;
+	*last_error = error;
+
+	float pid_out = KP * error + KI * (*cumulative_error) + KD * rate_error;
+	/*if (axis == AXIS_X) {
+		printf("Axis: %d\nCurrent position: %f\nEnd position: %f\nPID output: %f\n", axis, current_position, end_position, pid_out);
+	}*/
 
 	// Calculate the PWM duty cycle for this increment
-	float rotations_per_second = velocity_increment / THREAD_PITCH;
+	float rotations_per_second = fabsf(pid_out/dt) / THREAD_PITCH;
 	// Convert to duty cycle in %
 	int32_t duty_cycle = (rotations_per_second / MOTOR_MAX_RPS) * 100;
 	// Clamp duty cycle to 100% max and 0% minimum
@@ -179,30 +234,32 @@ static void _move_axis(axis_t axis, uint32_t time) {
 		duty_cycle = 0;
 	}
 
-	// Set motor PWM duty cycle
-	if (relative_position > 0) {
+	// Set axis motor PWM duty cycle
+	if (error > 0 && error > ALLOWED_ERROR_MARGIN) {
 		motor_timer->Instance->CCR1 = duty_cycle;
 		motor_timer->Instance->CCR2 = 0;
-	} else if (relative_position < 0) {
+
+	} else if (error < 0 && error < -ALLOWED_ERROR_MARGIN) {
 		motor_timer->Instance->CCR1 = 0;
 		motor_timer->Instance->CCR2 = duty_cycle;
+
 	} else {
 		// Stop motor
-		_stop_axis(axis);
+		_stop_axis(axis, false);
 	}
 }
 
 void move_x(float position, float feedrate) {
-	_state.move_start_time_x = HAL_GetTick();
-	_state.move_end_x = position;
-	_state.move_start_x = _state.position.x;
+	_state.axis_x.move_start_time = HAL_GetTick();
+	_state.axis_x.move_end = position;
+	_state.axis_x.move_start = _state.position.x;
 	_state.feedrate = feedrate;
 }
 
 void move_y(float position, float feedrate) {
-	_state.move_start_time_y = HAL_GetTick();
-	_state.move_end_y = position;
-	_state.move_start_y = _state.position.y;
+	_state.axis_y.move_start_time = HAL_GetTick();
+	_state.axis_y.move_end = position;
+	_state.axis_y.move_start = _state.position.y;
 	_state.feedrate = feedrate;
 }
 
@@ -211,22 +268,36 @@ void move(vector_2d_t position, float feedrate) {
 	move_y(position.y, feedrate);
 }
 
-static void _stop_axis(axis_t axis) {
+static void _stop_axis(axis_t axis, bool clear) {
 	switch (axis) {
 		case AXIS_X:
 			_motor_a_timer->Instance->CCR1 = 0;
 			_motor_a_timer->Instance->CCR2 = 0;
-			_state.move_start_time_x = 0;
-			_state.move_start_x = 0;
-			_state.move_end_x = 0;
+
+			if (clear) {
+				_state.axis_x.last_sample_time = 0;
+				_state.axis_x.move_start_time = 0;
+				_state.axis_x.move_start = 0;
+				_state.axis_x.move_end = 0;
+				_state.axis_x.last_error = 0.0;
+				_state.axis_x.last_position = 0.0;
+				_state.axis_x.cumulative_error = 0.0;
+			}
 			return;
 
 		case AXIS_Y:
 			_motor_b_timer->Instance->CCR1 = 0;
 			_motor_b_timer->Instance->CCR2 = 0;
-			_state.move_start_time_y = 0;
-			_state.move_start_y = 0;
-			_state.move_end_y = 0;
+
+			if (clear) {
+				_state.axis_y.last_sample_time = 0;
+				_state.axis_y.move_start_time = 0;
+				_state.axis_y.move_start = 0;
+				_state.axis_y.move_end = 0;
+				_state.axis_y.last_error = 0.0;
+				_state.axis_y.last_position = 0.0;
+				_state.axis_y.cumulative_error = 0.0;
+			}
 			return;
 
 		default:
@@ -235,16 +306,16 @@ static void _stop_axis(axis_t axis) {
 }
 
 void stop_x(void) {
-	_stop_axis(AXIS_X);
+	_stop_axis(AXIS_X, true);
 }
 
 void stop_y(void) {
-	_stop_axis(AXIS_Y);
+	_stop_axis(AXIS_Y, true);
 }
 
 void stop(void) {
-	_stop_axis(AXIS_X);
-	_stop_axis(AXIS_Y);
+	_stop_axis(AXIS_X, true);
+	_stop_axis(AXIS_Y, true);
 }
 
 void home_x(void) {
@@ -308,9 +379,8 @@ void motor_driver_update(void) {
 	_update_axis_absolute_position(AXIS_X, TIM1->CNT);
 	_update_axis_absolute_position(AXIS_Y, TIM4->CNT);
 	// Update the incremental move controller
-	uint32_t time = HAL_GetTick();
-	_move_axis(AXIS_X, time);
-	_move_axis(AXIS_Y, time);
+	_move_axis(AXIS_X);
+	_move_axis(AXIS_Y);
 }
 
 state_t get_state(void) {

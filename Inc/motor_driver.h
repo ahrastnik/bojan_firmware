@@ -31,18 +31,27 @@ typedef struct Vector2D {
 } vector_2d_t;
 
 /**
+ * Axis information
+ */
+typedef struct AxisInfo {
+	uint32_t last_sample_time;
+	uint32_t move_start_time;
+	float last_position;
+	float move_start;
+	float move_end;
+	float last_error;
+	float cumulative_error;
+} axis_info_t;
+
+/**
  * Current driver state
  */
 typedef struct MachineState {
 	vector_2d_t position;
-	uint32_t move_start_time_x;
-	float move_start_x;
-	float move_end_x;
-	uint32_t move_start_time_y;
-	float move_start_y;
-	float move_end_y;
-	float feedrate;
 	uint8_t z;
+	axis_info_t axis_x;
+	axis_info_t axis_y;
+	float feedrate;
 } state_t;
 
 /**
