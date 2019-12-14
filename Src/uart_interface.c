@@ -56,6 +56,7 @@ const char* COMMANDS[] = {
     "RESET",
     "LED",
 	"M112",
+	"M114",
 	"G00",
 	"G01",
 	"G28",
@@ -153,6 +154,8 @@ static float str_to_float(char *str) {
 }
 
 static void handle_command(command_t command) {
+	state_t driver_state = get_state();
+
 	switch (command) {
 		case CMD_RESET:
 			// Reset the system
@@ -190,10 +193,13 @@ static void handle_command(command_t command) {
 			stop();
 			break;
 
+		case CMD_M114:
+			printf("X: %f\tY: %f\n", driver_state.position.x, driver_state.position.y);
+			break;
+
 		case CMD_G00:
 			// Rapid positioning
 			if (command_args_num >= 1) {
-				state_t driver_state = get_state();
 				driver_state.feedrate = DEFAULT_G00_FEEDRATE;
 				char parse_buffer[COMMAND_ARGS_MAX];
 

@@ -21,6 +21,7 @@ typedef enum {
     CMD_RESET,
     CMD_LED,
 	CMD_M112,
+	CMD_M114,
 	CMD_G00,
 	CMD_G01,
 	CMD_G28,
