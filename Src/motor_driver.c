@@ -24,6 +24,8 @@
 #define KI (0.00001f)
 #define KD (0.00005f)
 #define ALLOWED_ERROR_MARGIN (0.05f)
+// Runtime
+#define MOVE_FINISHED_REPLY "ACK\n"
 
 
 // Private function declarations
@@ -68,7 +70,8 @@ static volatile state_t _state = {
 				.move_start = 0.0,
 				.move_end = 0.0,
 				.last_error = 0.0,
-				.cumulative_error = 0.0
+				.cumulative_error = 0.0,
+				.moving = false
 		},
 		.axis_y = {
 				.last_sample_time = 0,
@@ -77,9 +80,10 @@ static volatile state_t _state = {
 				.move_start = 0.0,
 				.move_end = 0.0,
 				.last_error = 0.0,
-				.cumulative_error = 0.0
+				.cumulative_error = 0.0,
+				.moving = false
 		},
-		.feedrate = 0.0
+		.feedrate = 0.0,
 };
 
 // Encoders
@@ -148,12 +152,14 @@ static void _move_axis(axis_t axis) {
 	float current_position;
 	float start_position;
 	float end_position;
-	float feedrate;
 	float move_time;
 	float dt;
 	float last_position;
 	volatile float *cumulative_error;
 	volatile float *last_error;
+	volatile bool *moving;
+
+	float feedrate = _state.feedrate;
 
 	switch (axis) {
 		case AXIS_X:
@@ -168,7 +174,7 @@ static void _move_axis(axis_t axis) {
 			end_position = _state.axis_x.move_end;
 			last_error = &_state.axis_x.last_error;
 			cumulative_error = &_state.axis_x.cumulative_error;
-			feedrate = _state.feedrate;
+			moving = &_state.axis_x.moving;
 			break;
 
 		case AXIS_Y:
@@ -183,17 +189,28 @@ static void _move_axis(axis_t axis) {
 			end_position = _state.axis_y.move_end;
 			last_error = &_state.axis_y.last_error;
 			cumulative_error = &_state.axis_y.cumulative_error;
-			feedrate = _state.feedrate;
+			moving = &_state.axis_y.moving;
 			break;
 
 		default:
 			return;
 	}
 
+	// Check if the axis is active
+	if (!*moving) {
+		return;
+	}
+
 	// Check if the position was already reached
 	float margin = end_position - current_position;
 	if (margin <= ALLOWED_ERROR_MARGIN
 			&& margin >= -ALLOWED_ERROR_MARGIN) {
+		// Notify about the finished move
+		if ((*moving && !_state.axis_x.moving) ||
+				(*moving && !_state.axis_y.moving)) {
+			printf(MOVE_FINISHED_REPLY);
+		}
+		*moving = false;
 		_stop_axis(axis, false);
 		return;
 	}
@@ -259,6 +276,7 @@ void move_x(float position, float feedrate) {
 	_state.axis_x.move_start_time = HAL_GetTick();
 	_state.axis_x.move_end = position;
 	_state.axis_x.move_start = _state.position.x;
+	_state.axis_x.moving = true;
 	_state.feedrate = feedrate;
 }
 
@@ -266,6 +284,7 @@ void move_y(float position, float feedrate) {
 	_state.axis_y.move_start_time = HAL_GetTick();
 	_state.axis_y.move_end = position;
 	_state.axis_y.move_start = _state.position.y;
+	_state.axis_y.moving = true;
 	_state.feedrate = feedrate;
 }
 
@@ -275,6 +294,7 @@ void move(vector_2d_t position, float feedrate) {
 }
 
 static void _stop_axis(axis_t axis, bool clear) {
+	// Reset axis specific variables
 	switch (axis) {
 		case AXIS_X:
 			_motor_a_timer->Instance->CCR1 = 0;
@@ -288,6 +308,7 @@ static void _stop_axis(axis_t axis, bool clear) {
 				_state.axis_x.last_error = 0.0;
 				_state.axis_x.last_position = 0.0;
 				_state.axis_x.cumulative_error = 0.0;
+				_state.axis_x.moving = false;
 			}
 			return;
 
@@ -303,6 +324,7 @@ static void _stop_axis(axis_t axis, bool clear) {
 				_state.axis_y.last_error = 0.0;
 				_state.axis_y.last_position = 0.0;
 				_state.axis_y.cumulative_error = 0.0;
+				_state.axis_y.moving = false;
 			}
 			return;
 

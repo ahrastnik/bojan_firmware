@@ -12,6 +12,8 @@
  extern "C" {
 #endif
 
+#include <stdbool.h>
+
 #include "stm32l4xx_hal.h"
 
 /**
@@ -41,6 +43,7 @@ typedef struct AxisInfo {
 	float move_end;
 	float last_error;
 	float cumulative_error;
+	bool moving;
 } axis_info_t;
 
 /**
