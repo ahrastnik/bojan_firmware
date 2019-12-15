@@ -13,13 +13,13 @@
 
 #include "main.h"
 
-// Macros
+// Machine parameters
 #define ENCODER_CPR	(48.0f) // Counts per revolution
 #define GEAR_RATIO (20.4f)	// 20.4:1
 #define THREAD_PITCH (2.4f) // [mm]
 #define MOTOR_STEP (THREAD_PITCH / (ENCODER_CPR * GEAR_RATIO))
 #define MOTOR_MAX_RPS (370.0f / 60.0f) // Max rotations per seconds at no load (12V)
-
+// PID regulator
 #define KP (0.15f)
 #define KI (0.00001f)
 #define KD (0.00005f)
@@ -189,6 +189,7 @@ static void _move_axis(axis_t axis) {
 		default:
 			return;
 	}
+
 	// Check if the position was already reached
 	float margin = end_position - current_position;
 	if (margin <= ALLOWED_ERROR_MARGIN
@@ -198,31 +199,31 @@ static void _move_axis(axis_t axis) {
 	}
 
 	// Calculate the axis position difference after move
-	// TODO: This statement causes the initial error to not be corrected by the PID regulation
 	float relative_position = end_position - start_position;
+	// Calculate the position error
+	float error;
+
 	if (relative_position == 0) {
-		_stop_axis(axis, false);
-		return;
+		// Apply simple step
+		error = end_position - current_position;
+
+	} else {
+		// Apply S-curve
+		float absolute_relative_position = fabsf(relative_position);
+		float time_to_arrival = absolute_relative_position / feedrate;
+
+		// Calculate the S-curve
+		float position = (-2 / pow(time_to_arrival, 3))*relative_position*pow(move_time, 3) + (3 / pow(time_to_arrival, 2))*relative_position*pow(move_time, 2)+start_position;
+		// Clamp S-curve by time
+		position = move_time > time_to_arrival ? end_position : position;
+		error = position - current_position;
 	}
-	float absolute_relative_position = fabsf(relative_position);
-	float time_to_arrival = absolute_relative_position / feedrate;
 
-	// Calculate the new velocity increment
-	//float velocity_increment = (-6 / pow(time_to_arrival, 3))*absolute_relative_position*pow(move_time, 2) + (6 / pow(time_to_arrival, 2))*absolute_relative_position*move_time;
-	//velocity_increment = velocity_increment < 0 ? 0 : velocity_increment;
-
-	// Calculate the S-curve
-	float position = (-2 / pow(time_to_arrival, 3))*relative_position*pow(move_time, 3) + (3 / pow(time_to_arrival, 2))*relative_position*pow(move_time, 2)+start_position;
-	// Clamp S-curve by time
-	position = move_time > time_to_arrival ? end_position : position;
-
-	// Calculate the real vs calculated velocity difference
-	// float dx = current_position - last_position;
-	float error = position - current_position;
+	// Calculate other PID regulator parameters
 	*cumulative_error += error * dt;
 	float rate_error = (error - *last_error) / dt;
 	*last_error = error;
-
+	// Calculate the PID output
 	float pid_out = KP * error + KI * (*cumulative_error) + KD * rate_error;
 	/*if (axis == AXIS_X) {
 		printf("Axis: %d\nCurrent position: %f\nEnd position: %f\nPID output: %f\n", axis, current_position, end_position, pid_out);
