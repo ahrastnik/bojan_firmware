@@ -213,6 +213,13 @@ static void handle_command(command_t command) {
 					} else if (command_args[i][0] == 'Y') {
 						driver_state.position.y = str_to_float(parse_buffer);
 
+					} else if (command_args[i][0] == 'Z') {
+						if (str_to_float(parse_buffer) > 0) {
+							brush_drop();
+						} else {
+							brush_raise();
+						}
+
 					} else if (command_args[i][0] == 'F') {
 						driver_state.feedrate = str_to_float(parse_buffer);
 					}

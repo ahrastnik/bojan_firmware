@@ -51,7 +51,7 @@ typedef struct AxisInfo {
  */
 typedef struct MachineState {
 	vector_2d_t position;
-	uint8_t z;
+	bool z;
 	axis_info_t axis_x;
 	axis_info_t axis_y;
 	float feedrate;
@@ -72,7 +72,8 @@ void motor_driver_init(
 		TIM_HandleTypeDef *motor_a_timer,
 		TIM_HandleTypeDef *motor_a_encoder_timer,
 		TIM_HandleTypeDef *motor_b_timer,
-		TIM_HandleTypeDef *motor_b_encoder_timer);
+		TIM_HandleTypeDef *motor_b_encoder_timer,
+		TIM_HandleTypeDef *servo_motor_timer);
 
 /**
  * Enable the X axis - motor A
@@ -119,6 +120,16 @@ void move_y(float position, float feedrate);
  * @param feedrate	Feedrate at which to move the tool
  */
 void move(vector_2d_t position, float feedrate);
+
+/**
+ * Drop the paint brush, to start painting
+ */
+void brush_drop(void);
+
+/**
+ * Raise the paint brush, to stop painting
+ */
+void brush_raise(void);
 
 /**
  * Stop the X axis

@@ -14,12 +14,20 @@
 #include "main.h"
 
 // Machine parameters
-#define ENCODER_CPR	(48.0f) // Counts per revolution
-#define GEAR_RATIO (20.4f)	// 20.4:1
-#define THREAD_PITCH (2.4f) // [mm]
-#define MOTOR_STEP (THREAD_PITCH / (ENCODER_CPR * GEAR_RATIO))
-#define MOTOR_MAX_RPS (370.0f / 60.0f) // Max rotations per seconds at no load (12V)
-#define MOTOR_MAX_FEEDRATE (MOTOR_MAX_RPS * THREAD_PITCH) // [mm/s]
+#define ENCODER_CPR			(48.0f) // Counts per revolution
+#define GEAR_RATIO 			(20.4f)	// 20.4:1
+#define THREAD_PITCH 		(2.4f) // [mm]
+#define MOTOR_STEP 			(THREAD_PITCH / (ENCODER_CPR * GEAR_RATIO))
+#define MOTOR_MAX_RPS 		(370.0f / 60.0f) // Max rotations per seconds at no load (12V)
+#define MOTOR_MAX_FEEDRATE 	(MOTOR_MAX_RPS * THREAD_PITCH) // [mm/s]
+// Servo (brush)
+#define SERVO_FREQUENCY 	(50.0f) // [Hz]
+#define SERVO_DUTY_RANGE 	1000 // Duty cycle range
+#define SERVO_TIME_RANGE	(1000.0f / SERVO_FREQUENCY) // [ms]
+#define SERVO_TO_DUTY(X)	((X / SERVO_TIME_RANGE) * SERVO_DUTY_RANGE)
+#define SERVO_RIGHT 		SERVO_TO_DUTY(1.0f) // [ms]
+#define SERVO_CENTER		SERVO_TO_DUTY(1.5f) // [ms]
+#define SERVO_LEFT 			SERVO_TO_DUTY(2.0f) // [ms]
 // PID regulator
 #define KP (0.15f)
 #define KI (0.00001f)
@@ -56,6 +64,7 @@ static TIM_HandleTypeDef *_motor_a_timer;
 static TIM_HandleTypeDef *_motor_a_encoder_timer;
 static TIM_HandleTypeDef *_motor_b_timer;
 static TIM_HandleTypeDef *_motor_b_encoder_timer;
+static TIM_HandleTypeDef *_servo_motor_timer;
 
 // Absolute tool position
 static volatile state_t _state = {
@@ -63,7 +72,7 @@ static volatile state_t _state = {
 				.x = 0.0,
 				.y = 0.0,
 		},
-		.z = 0,
+		.z = false,
 		.axis_x = {
 				.last_sample_time = 0,
 				.move_start_time = 0,
@@ -102,13 +111,15 @@ void motor_driver_init(
 		TIM_HandleTypeDef *motor_a_timer,
 		TIM_HandleTypeDef *motor_a_encoder_timer,
 		TIM_HandleTypeDef *motor_b_timer,
-		TIM_HandleTypeDef *motor_b_encoder_timer) {
+		TIM_HandleTypeDef *motor_b_encoder_timer,
+		TIM_HandleTypeDef *servo_motor_timer) {
 
 	// Store timer pointers for internal use
 	_motor_a_timer = motor_a_timer;
 	_motor_a_encoder_timer = motor_a_encoder_timer;
 	_motor_b_timer = motor_b_timer;
 	_motor_b_encoder_timer = motor_b_encoder_timer;
+	_servo_motor_timer = servo_motor_timer;
 
 	// Motor A
 	axis_x_enable();
@@ -125,6 +136,10 @@ void motor_driver_init(
 
 	HAL_TIM_Encoder_Start(motor_b_encoder_timer, TIM_CHANNEL_1);
 	HAL_TIM_Encoder_Start(motor_b_encoder_timer, TIM_CHANNEL_2);
+
+	// Servo motor
+	HAL_TIM_PWM_Start(servo_motor_timer, TIM_CHANNEL_1);
+	_servo_motor_timer->Instance->CCR1 = SERVO_CENTER;
 }
 
 void axis_x_enable(void) {
@@ -295,6 +310,20 @@ void move_y(float position, float feedrate) {
 void move(vector_2d_t position, float feedrate) {
 	move_x(position.x, feedrate);
 	move_y(position.y, feedrate);
+}
+
+void brush_drop(void) {
+	if (_state.z) return;
+
+	_servo_motor_timer->Instance->CCR1 = SERVO_LEFT;
+	_state.z = true;
+}
+
+void brush_raise(void) {
+	if (!_state.z) return;
+
+	_servo_motor_timer->Instance->CCR1 = SERVO_RIGHT;
+	_state.z = false;
 }
 
 static void _stop_axis(axis_t axis, bool clear) {

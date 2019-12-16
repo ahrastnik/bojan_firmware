@@ -20,10 +20,11 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include <stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
+
 #include "uart_interface.h"
 #include "motor_driver.h"
 /* USER CODE END Includes */
@@ -127,7 +128,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   // NOTE: The DMA MUST be initialized before the UART, otherwise the UART RX won't work
   uart_interface_init(&huart2);
-  motor_driver_init(&htim3, &htim1, &htim2, &htim4);
+  motor_driver_init(&htim3, &htim1, &htim2, &htim4, &htim16);
 
   /* USER CODE END 2 */
 
@@ -542,9 +543,9 @@ static void MX_TIM16_Init(void)
 
   /* USER CODE END TIM16_Init 1 */
   htim16.Instance = TIM16;
-  htim16.Init.Prescaler = 0;
+  htim16.Init.Prescaler = 1680-1;
   htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim16.Init.Period = 0;
+  htim16.Init.Period = 1000-1;
   htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim16.Init.RepetitionCounter = 0;
   htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
