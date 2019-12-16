@@ -19,6 +19,7 @@
 #define THREAD_PITCH (2.4f) // [mm]
 #define MOTOR_STEP (THREAD_PITCH / (ENCODER_CPR * GEAR_RATIO))
 #define MOTOR_MAX_RPS (370.0f / 60.0f) // Max rotations per seconds at no load (12V)
+#define MOTOR_MAX_FEEDRATE (MOTOR_MAX_RPS * THREAD_PITCH) // [mm/s]
 // PID regulator
 #define KP (0.15f)
 #define KI (0.00001f)
@@ -227,7 +228,10 @@ static void _move_axis(axis_t axis) {
 	} else {
 		// Apply S-curve
 		float absolute_relative_position = fabsf(relative_position);
-		float time_to_arrival = absolute_relative_position / feedrate;
+		// Clamp feedrate
+		feedrate = feedrate > MOTOR_MAX_FEEDRATE ? MOTOR_MAX_FEEDRATE : feedrate;
+		// Calculate time to arrival
+		float time_to_arrival = (3*absolute_relative_position) / (2*feedrate);
 
 		// Calculate the S-curve
 		float position = (-2 / pow(time_to_arrival, 3))*relative_position*pow(move_time, 3) + (3 / pow(time_to_arrival, 2))*relative_position*pow(move_time, 2)+start_position;
