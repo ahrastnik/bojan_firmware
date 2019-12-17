@@ -94,6 +94,7 @@ static volatile state_t _state = {
 				.moving = false
 		},
 		.feedrate = 0.0,
+		.position_mode = POSITIONING_ABSOLUTE
 };
 
 // Encoders
@@ -293,7 +294,13 @@ static void _move_axis(axis_t axis) {
 
 void move_x(float position, float feedrate) {
 	_state.axis_x.move_start_time = HAL_GetTick();
-	_state.axis_x.move_end = position;
+
+	if (_state.position_mode == POSITIONING_ABSOLUTE) {
+		_state.axis_x.move_end = position;
+	} else {
+		_state.axis_x.move_end += position;
+	}
+
 	_state.axis_x.move_start = _state.position.x;
 	_state.axis_x.moving = true;
 	_state.feedrate = feedrate;
@@ -301,7 +308,13 @@ void move_x(float position, float feedrate) {
 
 void move_y(float position, float feedrate) {
 	_state.axis_y.move_start_time = HAL_GetTick();
-	_state.axis_y.move_end = position;
+
+	if (_state.position_mode == POSITIONING_ABSOLUTE) {
+		_state.axis_y.move_end = position;
+	} else {
+		_state.axis_y.move_end += position;
+	}
+
 	_state.axis_y.move_start = _state.position.y;
 	_state.axis_y.moving = true;
 	_state.feedrate = feedrate;
@@ -394,6 +407,14 @@ void home_y(void) {
 void home(void) {
 	home_x();
 	home_y();
+}
+
+void positioning_absolute() {
+	_state.position_mode = POSITIONING_ABSOLUTE;
+}
+
+void positioning_relative() {
+	_state.position_mode = POSITIONING_RELATIVE;
 }
 
 static void _update_axis_absolute_position(axis_t axis, int16_t encoder_count) {

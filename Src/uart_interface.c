@@ -60,6 +60,8 @@ const char* COMMANDS[] = {
 	"G00",
 	"G01",
 	"G28",
+	"G90",
+	"G91",
     NULL
 };
 // Command buffer
@@ -234,6 +236,16 @@ static void handle_command(command_t command) {
 
 		case CMD_G28:
 			// Home axes
+			break;
+
+		case CMD_G90:
+			// Absolute positioning
+			positioning_absolute();
+			break;
+
+		case CMD_G91:
+			// Relative positioning
+			positioning_relative();
 			break;
 
 		default:

@@ -47,6 +47,14 @@ typedef struct AxisInfo {
 } axis_info_t;
 
 /**
+ * Positioning modes
+ */
+typedef enum PositioningModes {
+	 POSITIONING_ABSOLUTE,
+	 POSITIONING_RELATIVE
+} position_mode_t;
+
+/**
  * Current driver state
  */
 typedef struct MachineState {
@@ -55,6 +63,7 @@ typedef struct MachineState {
 	axis_info_t axis_x;
 	axis_info_t axis_y;
 	float feedrate;
+	position_mode_t position_mode;
 } state_t;
 
 /**
@@ -160,6 +169,16 @@ void home_y(void);
  * Move the tool on both axes to home
  */
 void home(void);
+
+/**
+ * Set absolute positioning
+ */
+void positioning_absolute(void);
+
+/**
+ * Set relative positioning
+ */
+void positioning_relative(void);
 
 /**
  * Update motor controls and read their absolute positions

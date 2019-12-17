@@ -25,6 +25,8 @@ typedef enum {
 	CMD_G00,
 	CMD_G01,
 	CMD_G28,
+	CMD_G90,
+	CMD_G91,
     CMD_NUM
 } command_t;
 
