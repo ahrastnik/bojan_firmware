@@ -62,6 +62,7 @@ const char* COMMANDS[] = {
 	"G28",
 	"G90",
 	"G91",
+	"J69",
     NULL
 };
 // Command buffer
@@ -156,6 +157,7 @@ static float str_to_float(char *str) {
 }
 
 static void handle_command(command_t command) {
+	char parse_buffer[COMMAND_ARGS_MAX];
 	state_t driver_state = get_state();
 
 	switch (command) {
@@ -192,9 +194,8 @@ static void handle_command(command_t command) {
 			// Rapid positioning
 			if (command_args_num >= 1) {
 				driver_state.feedrate = DEFAULT_G00_FEEDRATE;
-				char parse_buffer[COMMAND_ARGS_MAX];
 
-				// Parse X coordinate
+				// Parse parameters
 				uint8_t i;
 				for (i = 0; i < command_args_num; i++) {
 					memcpy(parse_buffer, (command_args[i])+1, strlen(command_args[i]));
@@ -236,6 +237,31 @@ static void handle_command(command_t command) {
 		case CMD_G91:
 			// Relative positioning
 			positioning_relative();
+			break;
+
+		case CMD_J69:
+			// Jogging
+			if (command_args_num >= 1) {
+				vector_2d_t feedrate = {
+						.x = 0.0,
+						.y = 0.0
+				};
+				// Parse parameters
+				uint8_t i;
+				for (i = 0; i < command_args_num; i++) {
+					memcpy(parse_buffer, (command_args[i])+1, strlen(command_args[i]));
+					if (command_args[i][0] == 'X') {
+						feedrate.x = str_to_float(parse_buffer);
+
+					} else if (command_args[i][0] == 'Y') {
+						feedrate.y = str_to_float(parse_buffer);
+					}
+				}
+				jog(feedrate);
+				break;
+			}
+			// Stop if no axis was provided
+			stop();
 			break;
 
 		default:

@@ -110,6 +110,13 @@ void axis_y_enable(void);
 void axis_y_disable(void);
 
 /**
+ * Jog at the requested feedrate
+ *
+ * @param feedrate
+ */
+void jog(vector_2d_t feedrate);
+
+/**
  * Move the tool absolutely on the X axis
  *
  * @param position	The position on which to move the X axis

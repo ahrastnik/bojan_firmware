@@ -37,6 +37,14 @@
 
 // Private function declarations
 /**
+ * Convert feedrate to PWM duty cycle
+ *
+ * @param 	feedrate	Feedrate in [mm/s]
+ *
+ * @returns PWM duty cycle [0 - 100]
+ */
+static uint32_t _feedrate_to_duty_cycle(float feedrate);
+/**
  * Update the moving axis
  *
  * @param axis	Axis to update
@@ -159,6 +167,49 @@ void axis_y_disable(void) {
 	HAL_GPIO_WritePin(EN_B_GPIO_Port, EN_B_Pin, GPIO_PIN_RESET);
 }
 
+void jog(vector_2d_t feedrate) {
+	if (feedrate.x > 0.0) {
+		_motor_a_timer->Instance->CCR1 = _feedrate_to_duty_cycle(fabsf(feedrate.x));
+		_motor_a_timer->Instance->CCR2 = 0;
+
+	} else if (feedrate.x < 0.0) {
+		_motor_a_timer->Instance->CCR1 = 0;
+		_motor_a_timer->Instance->CCR2 = _feedrate_to_duty_cycle(fabsf(feedrate.x));
+
+	} else if (feedrate.x == 0.0) {
+		_motor_a_timer->Instance->CCR1 = 0;
+		_motor_a_timer->Instance->CCR2 = 0;
+
+	} else if (feedrate.y > 0.0) {
+		_motor_b_timer->Instance->CCR1 = _feedrate_to_duty_cycle(fabsf(feedrate.y));
+		_motor_b_timer->Instance->CCR2 = 0;
+
+	} else if (feedrate.y < 0.0) {
+		_motor_b_timer->Instance->CCR1 = 0;
+		_motor_b_timer->Instance->CCR2 = _feedrate_to_duty_cycle(fabsf(feedrate.y));
+
+	} else if (feedrate.y == 0.0) {
+		_motor_b_timer->Instance->CCR1 = 0;
+		_motor_b_timer->Instance->CCR2 = 0;
+	}
+	printf(COMMAND_FINISHED_REPLY);
+}
+
+static uint32_t _feedrate_to_duty_cycle(float feedrate) {
+	// Clamp feedrate
+	feedrate = feedrate > MOTOR_MAX_FEEDRATE ? MOTOR_MAX_FEEDRATE : feedrate;
+	// Calculate the PWM duty cycle for this increment
+	float rotations_per_second = feedrate / THREAD_PITCH;
+	// Convert to duty cycle in %
+	int32_t duty_cycle = (rotations_per_second / MOTOR_MAX_RPS) * 100;
+	// Clamp duty cycle to 100% max and 0% minimum
+	if (duty_cycle > 100) {
+		duty_cycle = 100;
+	} else if (duty_cycle < 0) {
+		duty_cycle = 0;
+	}
+	return (uint32_t)duty_cycle;
+}
 
 static void _move_axis(axis_t axis) {
 	// Get the requested axis motor timer
@@ -262,15 +313,7 @@ static void _move_axis(axis_t axis) {
 	}*/
 
 	// Calculate the PWM duty cycle for this increment
-	float rotations_per_second = fabsf(pid_out/dt) / THREAD_PITCH;
-	// Convert to duty cycle in %
-	int32_t duty_cycle = (rotations_per_second / MOTOR_MAX_RPS) * 100;
-	// Clamp duty cycle to 100% max and 0% minimum
-	if (duty_cycle > 100) {
-		duty_cycle = 100;
-	} else if (duty_cycle < 0) {
-		duty_cycle = 0;
-	}
+	uint32_t duty_cycle = _feedrate_to_duty_cycle(fabsf(pid_out/dt));
 
 	// Set axis motor PWM duty cycle
 	if (error > 0) {
