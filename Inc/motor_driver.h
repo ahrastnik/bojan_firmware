@@ -16,6 +16,11 @@
 
 #include "stm32l4xx_hal.h"
 
+
+ // Replies
+ #define COMMAND_FINISHED_REPLY "ACK\n"
+ #define COMMAND_UNKNOWN_REPLY "NACK\n"
+
 /**
  * Movement axis definition
  */

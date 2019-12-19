@@ -33,8 +33,6 @@
 #define KI (0.00001f)
 #define KD (0.00005f)
 #define ALLOWED_ERROR_MARGIN (0.05f)
-// Runtime
-#define MOVE_FINISHED_REPLY "ACK\n"
 
 
 // Private function declarations
@@ -171,7 +169,6 @@ static void _move_axis(axis_t axis) {
 	float end_position;
 	float move_time;
 	float dt;
-	float last_position;
 	volatile float *cumulative_error;
 	volatile float *last_error;
 	volatile bool *moving;
@@ -185,7 +182,6 @@ static void _move_axis(axis_t axis) {
 			move_time = ((float)(time - _state.axis_x.move_start_time) / 1000);
 			dt = ((float)(time - _state.axis_x.last_sample_time) / 1000);
 			_state.axis_x.last_sample_time = time;
-			last_position = _state.axis_x.last_position;
 			_state.axis_x.last_position = _state.position.x;
 			start_position = _state.axis_x.move_start;
 			end_position = _state.axis_x.move_end;
@@ -200,7 +196,6 @@ static void _move_axis(axis_t axis) {
 			move_time = ((float)(time - _state.axis_y.move_start_time) / 1000);
 			dt = ((float)(time - _state.axis_y.last_sample_time) / 1000);
 			_state.axis_y.last_sample_time = time;
-			last_position = _state.axis_y.last_position;
 			_state.axis_y.last_position = _state.position.y;
 			start_position = _state.axis_y.move_start;
 			end_position = _state.axis_y.move_end;
@@ -225,7 +220,7 @@ static void _move_axis(axis_t axis) {
 		// Notify about the finished move
 		if ((*moving && !_state.axis_x.moving) ||
 				(*moving && !_state.axis_y.moving)) {
-			printf(MOVE_FINISHED_REPLY);
+			printf(COMMAND_FINISHED_REPLY);
 		}
 		*moving = false;
 		_stop_axis(axis, false);
@@ -390,6 +385,7 @@ void stop_y(void) {
 void stop(void) {
 	_stop_axis(AXIS_X, true);
 	_stop_axis(AXIS_Y, true);
+	printf(COMMAND_FINISHED_REPLY);
 }
 
 void home_x(void) {
@@ -407,14 +403,17 @@ void home_y(void) {
 void home(void) {
 	home_x();
 	home_y();
+	printf(COMMAND_FINISHED_REPLY);
 }
 
 void positioning_absolute() {
 	_state.position_mode = POSITIONING_ABSOLUTE;
+	printf(COMMAND_FINISHED_REPLY);
 }
 
 void positioning_relative() {
 	_state.position_mode = POSITIONING_RELATIVE;
+	printf(COMMAND_FINISHED_REPLY);
 }
 
 static void _update_axis_absolute_position(axis_t axis, int16_t encoder_count) {

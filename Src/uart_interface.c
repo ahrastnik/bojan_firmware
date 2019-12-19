@@ -176,22 +176,11 @@ static void handle_command(command_t command) {
 				break;
 			}
 			HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+			printf(COMMAND_FINISHED_REPLY);
 			break;
 
 		case CMD_M112:
 			// Emergency stop
-			if (command_args_num == 1) {
-				if (command_args[0][0] == 'X') {
-					stop_x();
-
-				} else if (command_args[0][0] == 'Y') {
-					stop_y();
-
-				} else {
-					stop();
-				}
-				break;
-			}
 			stop();
 			break;
 
@@ -236,6 +225,7 @@ static void handle_command(command_t command) {
 
 		case CMD_G28:
 			// Home axes
+			home();
 			break;
 
 		case CMD_G90:
@@ -249,7 +239,7 @@ static void handle_command(command_t command) {
 			break;
 
 		default:
-			printf("Invalid command!\n");
+			printf(COMMAND_UNKNOWN_REPLY);
 			break;
 	}
 }
