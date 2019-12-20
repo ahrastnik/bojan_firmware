@@ -17,14 +17,11 @@
 
 #include "motor_driver.h"
 
-#define COMMAND_LEN_MAX     32
+#define COMMAND_LEN_MAX     256
 #define COMMAND_LEN_MIN     2
 #define CMD_DELIMITER       " "
 #define COMMAND_ARGS_MAX	8
 #define ARGS_LEN_MAX		32
-
-#define DEFAULT_G00_FEEDRATE	(10.0f)
-#define DEFAULT_G01_FEEDRATE	(5.0f)
 
 /**
  * Converts a string argument to a number
@@ -193,8 +190,6 @@ static void handle_command(command_t command) {
 		case CMD_G00:
 			// Rapid positioning
 			if (command_args_num >= 1) {
-				driver_state.feedrate = DEFAULT_G00_FEEDRATE;
-
 				// Parse parameters
 				uint8_t i;
 				for (i = 0; i < command_args_num; i++) {

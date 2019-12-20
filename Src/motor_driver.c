@@ -20,6 +20,7 @@
 #define MOTOR_STEP 			(THREAD_PITCH / (ENCODER_CPR * GEAR_RATIO))
 #define MOTOR_MAX_RPS 		(370.0f / 60.0f) // Max rotations per seconds at no load (12V)
 #define MOTOR_MAX_FEEDRATE 	(MOTOR_MAX_RPS * THREAD_PITCH) // [mm/s]
+#define DEFAULT_FEEDRATE 	(10.0f)
 // Servo (brush)
 #define SERVO_FREQUENCY 	(50.0f) // [Hz]
 #define SERVO_DUTY_RANGE 	1000 // Duty cycle range
@@ -29,9 +30,9 @@
 #define SERVO_CENTER		SERVO_TO_DUTY(1.5f) // [ms]
 #define SERVO_LEFT 			SERVO_TO_DUTY(2.0f) // [ms]
 // PID regulator
-#define KP (0.15f)
-#define KI (0.00001f)
-#define KD (0.00005f)
+#define KP 					(0.15f)
+#define KI 					(0.00001f)
+#define KD 					(0.00005f)
 #define ALLOWED_ERROR_MARGIN (0.05f)
 
 
@@ -99,7 +100,7 @@ static volatile state_t _state = {
 				.cumulative_error = 0.0,
 				.moving = false
 		},
-		.feedrate = 0.0,
+		.feedrate = DEFAULT_FEEDRATE,
 		.position_mode = POSITIONING_ABSOLUTE
 };
 
