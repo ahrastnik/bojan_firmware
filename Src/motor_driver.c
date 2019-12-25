@@ -271,10 +271,14 @@ static void _move_axis(axis_t axis) {
 		return;
 	}
 
-	// Check if the position was already reached
-	float margin = end_position - current_position;
-	if (margin <= ALLOWED_ERROR_MARGIN
-			&& margin >= -ALLOWED_ERROR_MARGIN) {
+	// Calculate the position error
+	float error = end_position - current_position;
+
+	// Check if the position was already reached and stable in the last two cycles
+	if (error <= ALLOWED_ERROR_MARGIN &&
+			error >= -ALLOWED_ERROR_MARGIN &&
+			*last_error <= ALLOWED_ERROR_MARGIN &&
+			*last_error >= -ALLOWED_ERROR_MARGIN) {
 		// Notify about the finished move
 		if ((*moving && !_state.axis_x.moving) ||
 				(*moving && !_state.axis_y.moving)) {
@@ -287,15 +291,9 @@ static void _move_axis(axis_t axis) {
 
 	// Calculate the axis position difference after move
 	float relative_position = end_position - start_position;
-	// Calculate the position error
-	float error;
 
-	if (relative_position == 0) {
-		// Apply simple step
-		error = end_position - current_position;
-
-	} else {
-		// Apply S-curve
+	// Apply the S-curve, if the relative position is valid
+	if (relative_position != 0) {
 		float absolute_relative_position = fabsf(relative_position);
 		// Clamp feedrate
 		feedrate = feedrate > MOTOR_MAX_FEEDRATE ? MOTOR_MAX_FEEDRATE : feedrate;
