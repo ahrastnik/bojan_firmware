@@ -17,9 +17,9 @@
 #include "stm32l4xx_hal.h"
 
 
- // Replies
- #define COMMAND_FINISHED_REPLY "ACK\n"
- #define COMMAND_UNKNOWN_REPLY "NACK\n"
+// Replies
+#define COMMAND_FINISHED_REPLY 	"ACK\n"
+#define COMMAND_UNKNOWN_REPLY 	"NACK\n"
 
 /**
  * Movement axis definition
@@ -48,6 +48,7 @@ typedef struct AxisInfo {
 	float move_end;
 	float last_error;
 	float cumulative_error;
+	uint8_t margin_check_counter;
 	bool moving;
 } axis_info_t;
 

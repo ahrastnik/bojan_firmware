@@ -32,10 +32,11 @@
 #define SERVO_CENTER		SERVO_TO_DUTY(1.5f) // [ms]
 #define SERVO_LEFT 			SERVO_TO_DUTY(2.0f) // [ms]
 // PID regulator
-#define KP 					(0.15f)
-#define KI 					(0.00001f)
-#define KD 					(0.00005f)
-#define ALLOWED_ERROR_MARGIN (0.05f)
+#define KP 						(1.0f)
+#define KI 						(0.001f)
+#define KD 						(0.005f)
+#define ALLOWED_ERROR_MARGIN 	(0.01f)
+#define ERROR_MARGIN_CHECKS		8
 
 
 // Private function declarations
@@ -96,6 +97,7 @@ static volatile state_t _state = {
 				.move_end = 0.0,
 				.last_error = 0.0,
 				.cumulative_error = 0.0,
+				.margin_check_counter = 0,
 				.moving = false
 		},
 		.axis_y = {
@@ -106,6 +108,7 @@ static volatile state_t _state = {
 				.move_end = 0.0,
 				.last_error = 0.0,
 				.cumulative_error = 0.0,
+				.margin_check_counter = 0,
 				.moving = false
 		},
 		.feedrate = DEFAULT_FEEDRATE,
@@ -229,6 +232,7 @@ static void _move_axis(axis_t axis) {
 	float dt;
 	volatile float *cumulative_error;
 	volatile float *last_error;
+	volatile uint8_t *margin_check_counter;
 	volatile bool *moving;
 
 	float feedrate = _state.feedrate;
@@ -245,6 +249,7 @@ static void _move_axis(axis_t axis) {
 			end_position = _state.axis_x.move_end;
 			last_error = &_state.axis_x.last_error;
 			cumulative_error = &_state.axis_x.cumulative_error;
+			margin_check_counter = &_state.axis_x.margin_check_counter;
 			moving = &_state.axis_x.moving;
 			break;
 
@@ -259,6 +264,7 @@ static void _move_axis(axis_t axis) {
 			end_position = _state.axis_y.move_end;
 			last_error = &_state.axis_y.last_error;
 			cumulative_error = &_state.axis_y.cumulative_error;
+			margin_check_counter = &_state.axis_y.margin_check_counter;
 			moving = &_state.axis_y.moving;
 			break;
 
@@ -275,18 +281,29 @@ static void _move_axis(axis_t axis) {
 	float error = end_position - current_position;
 
 	// Check if the position was already reached and stable in the last two cycles
+	// TODO: If the error is the same in the last few (e.g. 4) cycles, finish the move immediately
 	if (error <= ALLOWED_ERROR_MARGIN &&
-			error >= -ALLOWED_ERROR_MARGIN &&
-			*last_error <= ALLOWED_ERROR_MARGIN &&
-			*last_error >= -ALLOWED_ERROR_MARGIN) {
-		// Notify about the finished move
-		if ((*moving && !_state.axis_x.moving) ||
-				(*moving && !_state.axis_y.moving)) {
-			printf(COMMAND_FINISHED_REPLY);
+			error >= -ALLOWED_ERROR_MARGIN) {
+
+		if (*margin_check_counter < (ERROR_MARGIN_CHECKS - 1)) {
+			// Buffer the error
+			(*margin_check_counter)++;
+		} else {
+			// Notify about the finished move
+			if ((*moving && !_state.axis_x.moving) ||
+					(*moving && !_state.axis_y.moving)) {
+				printf(COMMAND_FINISHED_REPLY);
+			}
+			*moving = false;
+			// Reset the error margin counter
+			*margin_check_counter = 0;
 		}
-		*moving = false;
 		_stop_axis(axis, false);
 		return;
+
+	} else {
+		// Reset the error margin counter
+		*margin_check_counter = 0;
 	}
 
 	// Calculate the axis position difference after move
