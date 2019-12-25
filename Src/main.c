@@ -134,20 +134,20 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint32_t i = 0;
+  // uint32_t i = 0;
   while (1)
   {
 	  motor_driver_update();
-	  state_t state = get_state();
+	  /*state_t state = get_state();
 
 	  i++;
 	  if (i >= 100) {
-		  /*printf("Absolute position - X: %f, Y: %f\nMove start - X: %f, Y: %f\nMove end - X: %f, Y: %f\n",
+		  printf("Absolute position - X: %f, Y: %f\nMove start - X: %f, Y: %f\nMove end - X: %f, Y: %f\n",
 		  			  state.position.x, state.position.y,
 		  			  state.axis_x.move_start, state.axis_y.move_start,
-		  			  state.axis_x.move_end, state.axis_y.move_end);*/
+		  			  state.axis_x.move_end, state.axis_y.move_end);
 		  i = 0;
-	  }
+	  }*/
 
 	  HAL_Delay(10);
     /* USER CODE END WHILE */

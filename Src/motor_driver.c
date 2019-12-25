@@ -14,6 +14,8 @@
 #include "main.h"
 
 // Machine parameters
+#define WORKSPACE_X			(100.0f) // 100 mm on X axis
+#define WORKSPACE_Y			(100.0f) // 100 mm on Y axis
 #define ENCODER_CPR			(48.0f) // Counts per revolution
 #define GEAR_RATIO 			(20.4f)	// 20.4:1
 #define THREAD_PITCH 		(2.4f) // [mm]
@@ -58,6 +60,12 @@ static void _move_axis(axis_t axis);
  * @param clear	Clear the axis data
  */
 static void _stop_axis(axis_t axis, bool clear);
+/**
+ * Clamp axis to the defined workspace
+ *
+ * @param axis	Axis to clamp
+ */
+static void _clamp_axis(axis_t axis);
 /**
  * Get the current absolute position of the axis
  *
@@ -178,8 +186,7 @@ void jog(vector_2d_t feedrate) {
 		_motor_a_timer->Instance->CCR2 = _feedrate_to_duty_cycle(fabsf(feedrate.x));
 
 	} else if (feedrate.x == 0.0) {
-		_motor_a_timer->Instance->CCR1 = 0;
-		_motor_a_timer->Instance->CCR2 = 0;
+		_stop_axis(AXIS_X, false);
 
 	} else if (feedrate.y > 0.0) {
 		_motor_b_timer->Instance->CCR1 = _feedrate_to_duty_cycle(fabsf(feedrate.y));
@@ -190,8 +197,7 @@ void jog(vector_2d_t feedrate) {
 		_motor_b_timer->Instance->CCR2 = _feedrate_to_duty_cycle(fabsf(feedrate.y));
 
 	} else if (feedrate.y == 0.0) {
-		_motor_b_timer->Instance->CCR1 = 0;
-		_motor_b_timer->Instance->CCR2 = 0;
+		_stop_axis(AXIS_Y, false);
 	}
 	printf(COMMAND_FINISHED_REPLY);
 }
@@ -333,20 +339,32 @@ static void _move_axis(axis_t axis) {
 
 void move_x(float position, float feedrate) {
 	_state.axis_x.move_start_time = HAL_GetTick();
+	_state.axis_x.move_start = _state.position.x;
+	_state.axis_x.moving = true;
+	_state.feedrate = feedrate;
 
+	// Set the new move position
 	if (_state.position_mode == POSITIONING_ABSOLUTE) {
 		_state.axis_x.move_end = position;
 	} else {
 		_state.axis_x.move_end += position;
 	}
 
-	_state.axis_x.move_start = _state.position.x;
-	_state.axis_x.moving = true;
-	_state.feedrate = feedrate;
+	// Clamp the move position to the available workspace
+#ifndef DEBUG
+	if (_state.axis_x.move_end > WORKSPACE_X) {
+		_state.axis_x.move_end = WORKSPACE_X;
+	} else if (_state.axis_x.move_end < 0.0) {
+		_state.axis_x.move_end = 0.0;
+	}
+#endif
 }
 
 void move_y(float position, float feedrate) {
 	_state.axis_y.move_start_time = HAL_GetTick();
+	_state.axis_y.move_start = _state.position.y;
+	_state.axis_y.moving = true;
+	_state.feedrate = feedrate;
 
 	if (_state.position_mode == POSITIONING_ABSOLUTE) {
 		_state.axis_y.move_end = position;
@@ -354,9 +372,13 @@ void move_y(float position, float feedrate) {
 		_state.axis_y.move_end += position;
 	}
 
-	_state.axis_y.move_start = _state.position.y;
-	_state.axis_y.moving = true;
-	_state.feedrate = feedrate;
+#ifndef DEBUG
+	if (_state.axis_y.move_end > WORKSPACE_Y) {
+		_state.axis_y.move_end = WORKSPACE_Y;
+	} else if (_state.axis_y.move_end < 0.0) {
+		_state.axis_y.move_end = 0.0;
+	}
+#endif
 }
 
 void move(vector_2d_t position, float feedrate) {
@@ -376,6 +398,35 @@ void brush_raise(void) {
 
 	_servo_motor_timer->Instance->CCR1 = SERVO_RIGHT;
 	_state.z = false;
+}
+
+static void _clamp_axis(axis_t axis) {
+	float position;
+	float max_position;
+	float min_position;
+
+	switch (axis) {
+		case AXIS_X:
+			position = _state.position.x;
+			max_position = WORKSPACE_X;
+			min_position = 0.0;
+			break;
+
+		case AXIS_Y:
+			position = _state.position.y;
+			max_position = WORKSPACE_Y;
+			min_position = 0.0;
+			break;
+
+		default:
+			return;
+	}
+
+	// Stop the axis, if it has breached the allowed workspace
+	if (position > max_position ||
+			position < min_position) {
+		_stop_axis(axis, true);
+	}
 }
 
 static void _stop_axis(axis_t axis, bool clear) {
@@ -500,6 +551,11 @@ static void _update_axis_absolute_position(axis_t axis, int16_t encoder_count) {
 }
 
 void motor_driver_update(void) {
+#ifndef DEBUG
+	// Prevent axis from moving if it breached the allowed workspace
+	_clamp_axis(AXIS_X);
+	_clamp_axis(AXIS_Y);
+#endif
 	// Get the absolute position
 	_update_axis_absolute_position(AXIS_X, TIM1->CNT);
 	_update_axis_absolute_position(AXIS_Y, TIM4->CNT);
