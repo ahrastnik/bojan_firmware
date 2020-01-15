@@ -154,7 +154,7 @@ static float str_to_float(char *str) {
 }
 
 static void handle_command(command_t command) {
-	char parse_buffer[COMMAND_ARGS_MAX];
+	char parse_buffer[ARGS_LEN_MAX];
 	state_t driver_state = get_state();
 
 	switch (command) {
@@ -187,6 +187,9 @@ static void handle_command(command_t command) {
 			printf("X: %f\tY: %f\n", driver_state.position.x, driver_state.position.y);
 			break;
 
+		case CMD_G01:
+			// Linear interpolation
+			// TODO: Implement linear interpolation
 		case CMD_G00:
 			// Rapid positioning
 			if (command_args_num >= 1) {
@@ -213,10 +216,6 @@ static void handle_command(command_t command) {
 				}
 				move(driver_state.position, driver_state.feedrate);
 			}
-			break;
-
-		case CMD_G01:
-			// Linear interpolation
 			break;
 
 		case CMD_G28:
