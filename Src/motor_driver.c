@@ -18,7 +18,7 @@
 #define WORKSPACE_Y			(100.0f) // 100 mm on Y axis
 #define ENCODER_CPR			(48.0f) // Counts per revolution
 #define GEAR_RATIO 			(20.4f)	// 20.4:1
-#define THREAD_PITCH 		(2.4f) // [mm]
+#define THREAD_PITCH 		(25.4f) // [mm]
 #define MOTOR_STEP 			(THREAD_PITCH / (ENCODER_CPR * GEAR_RATIO))
 #define MOTOR_MAX_RPS 		(370.0f / 60.0f) // Max rotations per seconds at no load (12V)
 #define MOTOR_MAX_FEEDRATE 	(MOTOR_MAX_RPS * THREAD_PITCH) // [mm/s]
@@ -35,7 +35,7 @@
 #define KP 						(1.0f)
 #define KI 						(0.001f)
 #define KD 						(0.005f)
-#define ALLOWED_ERROR_MARGIN 	(0.01f)
+#define ALLOWED_ERROR_MARGIN 	(0.05f) // [mm]
 #define ERROR_MARGIN_CHECKS		8
 
 
