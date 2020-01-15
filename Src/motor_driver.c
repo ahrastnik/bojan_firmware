@@ -22,7 +22,7 @@
 #define MOTOR_STEP 			(THREAD_PITCH / (ENCODER_CPR * GEAR_RATIO))
 #define MOTOR_MAX_RPS 		(370.0f / 60.0f) // Max rotations per seconds at no load (12V)
 #define MOTOR_MAX_FEEDRATE 	(MOTOR_MAX_RPS * THREAD_PITCH) // [mm/s]
-#define DEFAULT_FEEDRATE 	(10.0f)
+#define DEFAULT_FEEDRATE 	(MOTOR_MAX_FEEDRATE / 2) // [mm/s]
 // Servo (brush)
 #define SERVO_FREQUENCY 	(50.0f) // [Hz]
 #define SERVO_DUTY_RANGE 	1000 // Duty cycle range
