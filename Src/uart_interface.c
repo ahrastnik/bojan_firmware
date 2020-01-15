@@ -160,7 +160,7 @@ static void handle_command(command_t command) {
 	switch (command) {
 		case CMD_RESET:
 			// Reset the system
-			printf("Reseting...\n");
+			printf(COMMAND_FINISHED_REPLY);
 			NVIC_SystemReset();
 			break;
 

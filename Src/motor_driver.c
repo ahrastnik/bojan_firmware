@@ -49,6 +49,12 @@
  */
 static uint32_t _feedrate_to_duty_cycle(float feedrate);
 /**
+ * Jog the selected axis
+ *
+ * @param feedrate	Feedrate at which to jog the axis
+ */
+static void _jog_axis(axis_t axis, float feedrate);
+/**
  * Update the moving axis
  *
  * @param axis	Axis to update
@@ -68,12 +74,19 @@ static void _stop_axis(axis_t axis, bool clear);
  */
 static void _clamp_axis(axis_t axis);
 /**
+ * Home axis
+ *
+ * @param axis	Axis to home
+ */
+static void _home_axis(axis_t axis);
+/**
  * Get the current absolute position of the axis
  *
  * @param axis			Axis for which to update the absolute position
  * @param encoder_count	Current axis encoder timer count
  */
 static void _update_axis_absolute_position(axis_t axis, int16_t encoder_count);
+
 
 // Motor and encoder timers
 static TIM_HandleTypeDef *_motor_a_timer;
@@ -98,7 +111,8 @@ static volatile state_t _state = {
 				.last_error = 0.0,
 				.cumulative_error = 0.0,
 				.margin_check_counter = 0,
-				.moving = false
+				.moving = false,
+				.homing = false
 		},
 		.axis_y = {
 				.last_sample_time = 0,
@@ -109,7 +123,8 @@ static volatile state_t _state = {
 				.last_error = 0.0,
 				.cumulative_error = 0.0,
 				.margin_check_counter = 0,
-				.moving = false
+				.moving = false,
+				.homing = false
 		},
 		.feedrate = DEFAULT_FEEDRATE,
 		.position_mode = POSITIONING_ABSOLUTE
@@ -166,7 +181,7 @@ void axis_x_enable(void) {
 }
 
 void axis_x_disable(void) {
-	stop_x();
+	stop_x(false);
 	HAL_GPIO_WritePin(EN_A_GPIO_Port, EN_A_Pin, GPIO_PIN_RESET);
 }
 
@@ -175,33 +190,65 @@ void axis_y_enable(void) {
 }
 
 void axis_y_disable(void) {
-	stop_y();
+	stop_y(false);
 	HAL_GPIO_WritePin(EN_B_GPIO_Port, EN_B_Pin, GPIO_PIN_RESET);
 }
 
-void jog(vector_2d_t feedrate) {
-	if (feedrate.x > 0.0) {
-		_motor_a_timer->Instance->CCR1 = _feedrate_to_duty_cycle(fabsf(feedrate.x));
-		_motor_a_timer->Instance->CCR2 = 0;
+void axis_x_zero(void) {
+	_state.position.x = 0;
+}
 
-	} else if (feedrate.x < 0.0) {
-		_motor_a_timer->Instance->CCR1 = 0;
-		_motor_a_timer->Instance->CCR2 = _feedrate_to_duty_cycle(fabsf(feedrate.x));
+void axis_y_zero(void) {
+	_state.position.y = 0;
+}
 
-	} else if (feedrate.x == 0.0) {
-		_stop_axis(AXIS_X, false);
+static void _jog_axis(axis_t axis, float feedrate) {
+	TIM_HandleTypeDef *motor_timer;
+	volatile bool *moving;
 
-	} else if (feedrate.y > 0.0) {
-		_motor_b_timer->Instance->CCR1 = _feedrate_to_duty_cycle(fabsf(feedrate.y));
-		_motor_b_timer->Instance->CCR2 = 0;
+	switch (axis) {
+		case AXIS_X:
+			motor_timer = _motor_a_timer;
+			moving = &_state.axis_x.moving;
+			break;
 
-	} else if (feedrate.y < 0.0) {
-		_motor_b_timer->Instance->CCR1 = 0;
-		_motor_b_timer->Instance->CCR2 = _feedrate_to_duty_cycle(fabsf(feedrate.y));
+		case AXIS_Y:
+			motor_timer = _motor_b_timer;
+			moving = &_state.axis_y.moving;
+			break;
 
-	} else if (feedrate.y == 0.0) {
-		_stop_axis(AXIS_Y, false);
+		default:
+			return;
 	}
+
+	*moving = true;
+
+	if (feedrate > 0.0) {
+		motor_timer->Instance->CCR1 = _feedrate_to_duty_cycle(fabsf(feedrate));
+		motor_timer->Instance->CCR2 = 0;
+
+	} else if (feedrate < 0.0) {
+		motor_timer->Instance->CCR1 = 0;
+		motor_timer->Instance->CCR2 = _feedrate_to_duty_cycle(fabsf(feedrate));
+
+	} else {
+		_stop_axis(axis, false);
+	}
+}
+
+void jog_x(float feedrate) {
+	_jog_axis(AXIS_X, feedrate);
+	printf(COMMAND_FINISHED_REPLY);
+}
+
+void jog_y(float feedrate) {
+	_jog_axis(AXIS_Y, feedrate);
+	printf(COMMAND_FINISHED_REPLY);
+}
+
+void jog(vector_2d_t feedrate) {
+	_jog_axis(AXIS_X, feedrate.x);
+	_jog_axis(AXIS_Y, feedrate.y);
 	printf(COMMAND_FINISHED_REPLY);
 }
 
@@ -460,6 +507,7 @@ static void _stop_axis(axis_t axis, bool clear) {
 				_state.axis_x.last_position = 0.0;
 				_state.axis_x.cumulative_error = 0.0;
 				_state.axis_x.moving = false;
+				_state.axis_x.homing = false;
 			}
 			return;
 
@@ -476,6 +524,7 @@ static void _stop_axis(axis_t axis, bool clear) {
 				_state.axis_y.last_position = 0.0;
 				_state.axis_y.cumulative_error = 0.0;
 				_state.axis_y.moving = false;
+				_state.axis_y.homing = false;
 			}
 			return;
 
@@ -484,12 +533,18 @@ static void _stop_axis(axis_t axis, bool clear) {
 	}
 }
 
-void stop_x(void) {
+void stop_x(bool reply) {
 	_stop_axis(AXIS_X, true);
+	if (reply) {
+		printf(COMMAND_FINISHED_REPLY);
+	}
 }
 
-void stop_y(void) {
+void stop_y(bool reply) {
 	_stop_axis(AXIS_Y, true);
+	if (reply) {
+		printf(COMMAND_FINISHED_REPLY);
+	}
 }
 
 void stop(void) {
@@ -498,22 +553,46 @@ void stop(void) {
 	printf(COMMAND_FINISHED_REPLY);
 }
 
+static void _home_axis(axis_t axis) {
+	GPIO_TypeDef *port;
+	uint16_t pin;
+	volatile bool *homing;
+
+	switch (axis) {
+		case AXIS_X:
+			homing = &_state.axis_x.homing;
+			port = HOME_X_GPIO_Port;
+			pin = HOME_X_Pin;
+			break;
+
+		case AXIS_Y:
+			homing = &_state.axis_y.homing;
+			port = HOME_Y_GPIO_Port;
+			pin = HOME_Y_Pin;
+			break;
+
+		default:
+			return;
+	}
+
+	if (!HAL_GPIO_ReadPin(port, pin)) {
+		return;
+	}
+	*homing = true;
+	_jog_axis(axis, -DEFAULT_FEEDRATE);
+}
+
 void home_x(void) {
-	_motor_a_timer->Instance->CCR1 = 50;
-	while(HAL_GPIO_ReadPin(HOME_X_GPIO_Port, HOME_X_Pin));
-	_motor_a_timer->Instance->CCR1 = 0;
+	_home_axis(AXIS_X);
 }
 
 void home_y(void) {
-	_motor_b_timer->Instance->CCR1 = 50;
-	while(HAL_GPIO_ReadPin(HOME_Y_GPIO_Port, HOME_Y_Pin));
-	_motor_b_timer->Instance->CCR1 = 0;
+	_home_axis(AXIS_Y);
 }
 
 void home(void) {
-	home_x();
-	home_y();
-	printf(COMMAND_FINISHED_REPLY);
+	_home_axis(AXIS_X);
+	_home_axis(AXIS_Y);
 }
 
 void positioning_absolute() {

@@ -66,8 +66,10 @@ void Error_Handler(void);
 #define EN_B_GPIO_Port GPIOC
 #define HOME_X_Pin GPIO_PIN_2
 #define HOME_X_GPIO_Port GPIOC
+#define HOME_X_EXTI_IRQn EXTI2_IRQn
 #define HOME_Y_Pin GPIO_PIN_3
 #define HOME_Y_GPIO_Port GPIOC
+#define HOME_Y_EXTI_IRQn EXTI3_IRQn
 #define IN1_B_Pin GPIO_PIN_0
 #define IN1_B_GPIO_Port GPIOA
 #define IN2_B_Pin GPIO_PIN_1

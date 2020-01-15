@@ -50,6 +50,7 @@ typedef struct AxisInfo {
 	float cumulative_error;
 	uint8_t margin_check_counter;
 	bool moving;
+	bool homing;
 } axis_info_t;
 
 /**
@@ -111,6 +112,30 @@ void axis_y_enable(void);
 void axis_y_disable(void);
 
 /**
+ * Zeros the X position to 0
+ */
+void axis_x_zero(void);
+
+/**
+ * Zeros the Y position to 0
+ */
+void axis_y_zero(void);
+
+/**
+ * Jog X axis at the requested feedrate
+ *
+ * @param feedrate
+ */
+void jog_x(float feedrate);
+
+/**
+ * Jog Y axis at the requested feedrate
+ *
+ * @param feedrate
+ */
+void jog_y(float feedrate);
+
+/**
  * Jog at the requested feedrate
  *
  * @param feedrate
@@ -155,13 +180,17 @@ void brush_raise(void);
 
 /**
  * Stop the X axis
+ *
+ * @param reply	Should a COMMAND_FINISHED_REPLY be returned
  */
-void stop_x(void);
+void stop_x(bool reply);
 
 /**
  * Stop the Y axis
+ *
+ * @param reply	Should a COMMAND_FINISHED_REPLY be returned
  */
-void stop_y(void);
+void stop_y(bool reply);
 
 /**
  * Stop all axis
